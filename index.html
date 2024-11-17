@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบแสดงคุณภาพน้ำในตู้ปลา</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <header>ระบบแสดงคุณภาพน้ำในตู้ปลา</header>
+    <div class="main-content">
+        <!-- วิดีโอ -->
+        <div class="video-container">
+            <video id="camera-stream" autoplay muted playsinline controls>
+                <source src="http://<IP-ADDRESS>:<PORT>/video" type="video/mp4">
+                วิดีโอนี้ไม่รองรับในเบราว์เซอร์ของคุณ
+            </video>
+        </div>
+
+        <!-- ไฟ
+        <div class="light-container">
+            <div class="light">
+                <h3>ควบคุมไฟในตู้ปลา</h3>
+                <button id="light-toggle" class="light-control">เปิดไฟ</button>
+            </div>
+        </div> -->
+        
+        <!-- ค่าพารามิเตอร์ -->
+        <div class="parameters-container">
+            <div class="light">
+                <h3>ควบคุมไฟในตู้ปลา</h3>
+                <button id="light-toggle" class="light-control">เปิดไฟ</button>
+            </div>
+            <div class="parameter">
+                <h3>อุณหภูมิ (°C)</h3>
+                <p class="value" id="temperature">--</p>
+            </div>
+            <div class="parameter">
+                <h3>คุณภาพน้ำ (ppm)</h3>
+                <p class="value" id="tds">--</p>
+            </div>
+            <div class="parameter">
+                <h3>ระดับแสง (lux)</h3>
+                <p class="value" id="light">--</p>
+            </div>
+            <div class="parameter">
+                <h3>ระดับน้ำ (%)</h3>
+                <p class="value" id="water-level">--</p>
+            </div>
+            <div class="parameter">
+                <h3>pH</h3>
+                <p class="value" id="ph">--</p>
+            </div>
+        </div>
+    </div>
+    <script src="myscripts.js"></script>
+</body>
+
+</html>
