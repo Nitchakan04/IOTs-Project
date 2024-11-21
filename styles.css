@@ -113,16 +113,25 @@ header {
     gap: 20px;
 }
 
-.video-container {
+/* .video-container {
     width: 80%;
     max-width: 600px;
-}
+} */
 
-.video-container video {
+/* .video-container iframe {
     width: 100%;
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+} */
+
+.video-container iframe {
+    width: 800px; /* Makes it take up the full width of its container */
+    height: 400px; /* Adjust the height to make it taller */
+    border: none; /* Removes the border */
+    border-radius: 10px; /* Optional: Rounded corners */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Optional: Adds a shadow for better appearance */
 }
+
 
 .light-container {
     display: flex;
