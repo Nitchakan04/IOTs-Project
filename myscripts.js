@@ -65,116 +65,75 @@
 const apiURL = "http://<IP-ADDRESS>:<PORT>/api/sensors"; // URL API สำหรับดึงข้อมูลเซนเซอร์
 const lightControlURL = "http://<IP-ADDRESS>:<PORT>/api/light-control"; // URL API สำหรับควบคุมไฟ
 
+// สถานะไฟเริ่มต้น
 let lightStatuses = {
-  "light-1": false,
-  "light-2": false,
-  "light-3": false,
-  "light-4": false,
-}; // สถานะเริ่มต้นของไฟแต่ละดวง
+    "light-1": false,
+    "light-2": false,
+    "light-3": false,
+    "light-4": false,
+};
 
-// ฟังก์ชันดึงข้อมูลจาก API
+// ฟังก์ชันดึงข้อมูลเซนเซอร์
 async function fetchSensorData() {
-  try {
-    const response = await fetch(apiURL);
-    if (!response.ok) {
-      throw new Error("ไม่สามารถดึงข้อมูลจาก API ได้");
-    }
-    const data = await response.json();
+    try {
+        const response = await fetch(apiURL);
+        if (!response.ok) {
+            throw new Error("ไม่สามารถดึงข้อมูลจาก API ได้");
+        }
+        const data = await response.json();
 
-    // อัปเดตค่าบนหน้าเว็บ
-    document.getElementById("temperature").textContent =
-      data.temperature.toFixed(2);
-    document.getElementById("tds").textContent = data.tds.toFixed(2);
-    document.getElementById("light").textContent = data.light.toFixed(2);
-    document.getElementById("water-level").textContent =
-      data.water_level.toFixed(2);
-    document.getElementById("ph").textContent = data.ph.toFixed(2);
-  } catch (error) {
-    console.error("ข้อผิดพลาด:", error);
-  }
+        // อัปเดตค่าพารามิเตอร์
+        document.getElementById("temperature").textContent = data.temperature.toFixed(2);
+        document.getElementById("tds").textContent = data.tds.toFixed(2);
+        document.getElementById("light").textContent = data.light.toFixed(2);
+        document.getElementById("water-level").textContent = data.water_level.toFixed(2);
+        document.getElementById("ph").textContent = data.ph.toFixed(2);
+    } catch (error) {
+        console.error("ข้อผิดพลาดในการดึงข้อมูลเซนเซอร์:", error);
+    }
 }
 
-// // ฟังก์ชันสลับสถานะไฟดวงใดดวงหนึ่ง
-// async function toggleLight(lightId) {
-//   try {
-//     const currentStatus = lightStatuses[lightId];
-//     const response = await fetch(lightControlURL, {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//       },
-//       body: JSON.stringify({ id: lightId, status: !currentStatus }), // ส่งสถานะใหม่
-//     });
-
-//     if (!response.ok) {
-//       throw new Error("ไม่สามารถส่งคำสั่งไปยัง API ได้");
-//     }
-
-//     // อัปเดตสถานะไฟใหม่
-//     lightStatuses[lightId] = !currentStatus;
-
-//     // อัปเดตข้อความหรือไอคอน
-//     const button = document.getElementById(lightId);
-//     const img = button.querySelector("img");
-//     img.src = lightStatuses[lightId] ? "img/light2.png" : "img/light.png";
-//     button.title = lightStatuses[lightId] ? "light2" : "light1";
-//   } catch (error) {
-//     console.error("ข้อผิดพลาด:", error);
-//   }
-// }
+// ฟังก์ชันเปลี่ยนสถานะไฟ
 async function toggleLight(lightId) {
-  try {
-    // ตรวจสอบสถานะปัจจุบัน
-    const currentStatus = lightStatuses[lightId];
-    console.log(`สถานะไฟก่อนเปลี่ยน: ${lightId} = ${currentStatus}`);
+    try {
+        const currentStatus = lightStatuses[lightId]; // สถานะปัจจุบัน
+        console.log(`สถานะไฟก่อนเปลี่ยน: ${lightId} = ${currentStatus}`);
 
-    // ส่งคำขอ POST ไปที่ API
-    const response = await fetch(lightControlURL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ id: lightId, status: !currentStatus }), // ส่งสถานะใหม่
-    });
+        // ส่งคำสั่งไปยัง API
+        const response = await fetch(lightControlURL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ id: lightId, status: !currentStatus }),
+        });
 
-    if (!response.ok) {
-      throw new Error("ไม่สามารถส่งคำสั่งไปยัง API ได้");
+        if (!response.ok) {
+            throw new Error("ไม่สามารถส่งคำสั่งไปยัง API ได้");
+        }
+
+        // อัปเดตสถานะใหม่
+        lightStatuses[lightId] = !currentStatus;
+
+        // เปลี่ยนรูปภาพ
+        const button = document.getElementById(lightId);
+        const img = button.querySelector("img");
+        img.src = lightStatuses[lightId] ? "img/light2.png" : "img/light.png";
+        button.title = lightStatuses[lightId] ? "light2" : "light1";
+
+        console.log(`สถานะไฟใหม่: ${lightId} = ${lightStatuses[lightId]}`);
+    } catch (error) {
+        console.error("ข้อผิดพลาดในการควบคุมไฟ:", error);
     }
-
-    // อัปเดตสถานะใหม่
-    lightStatuses[lightId] = !currentStatus;
-    console.log(`สถานะไฟใหม่: ${lightId} = ${lightStatuses[lightId]}`);
-
-    // อัปเดตข้อความหรือไอคอน
-    const button = document.getElementById(lightId);
-    const img = button.querySelector("img");
-
-    // ตรวจสอบว่า img ถูกพบหรือไม่
-    if (!img) {
-      console.error(`ไม่พบ <img> ภายในปุ่ม ${lightId}`);
-      return;
-    }
-
-    // เปลี่ยนแหล่งที่มาของรูปภาพ
-    img.src = lightStatuses[lightId] ? "img/light2.png" : "img/light.png";
-    console.log(`เปลี่ยนรูปภาพ: ${img.src}`);
-
-    // เปลี่ยน title
-    button.title = lightStatuses[lightId] ? "light2" : "light1";
-  } catch (error) {
-    console.error("ข้อผิดพลาด:", error);
-  }
 }
 
-// ดึงข้อมูลทุก 3 วินาที
-setInterval(fetchSensorData, 3000);
-
-// เพิ่ม Event Listener ให้แต่ละปุ่ม
+// เพิ่ม Event Listener ให้ปุ่มทั้งหมด
 document.querySelectorAll(".light-icon").forEach((button) => {
-  button.addEventListener("click", () => {
-    toggleLight(button.id); // ส่ง id ของปุ่มที่ถูกกด
-  });
+    button.addEventListener("click", () => toggleLight(button.id));
 });
 
-// เรียกฟังก์ชันครั้งแรกเมื่อโหลดหน้า
+// ดึงข้อมูลเซนเซอร์ทุก 3 วินาที
+setInterval(fetchSensorData, 3000);
+
+// เรียกฟังก์ชันดึงข้อมูลเซนเซอร์ครั้งแรก
 fetchSensorData();
