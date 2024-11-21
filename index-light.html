@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 BH1750FVI Light Sensor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+            background-color: #f4f4f9;
+        }
+        h1 {
+            color: #333;
+        }
+        .data {
+            font-size: 2em;
+            margin: 20px 0;
+        }
+        .status {
+            font-size: 1.5em;
+            margin-top: 20px;
+            color: #555;
+        }
+        .status.on {
+            color: green;
+        }
+        .status.off {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Real-time BH1750FVI Light Sensor Data</h1>
+    <div>
+        <div>Light Intensity: <span id="lux" class="data">--</span> lux</div>
+        <div class="status" id="led-status">LED Status: --</div>
+    </div>
+    <script>
+        var gateway = `ws://${window.location.hostname}/ws`;
+        var websocket;
+
+        window.addEventListener('load', onLoad);
+
+        function onLoad(event) {
+            initWebSocket();
+        }
+
+        function initWebSocket() {
+            websocket = new WebSocket(gateway);
+            websocket.onopen = onOpen;
+            websocket.onclose = onClose;
+            websocket.onmessage = onMessage;
+        }
+
+        function onOpen(event) {
+            console.log('WebSocket connection opened');
+        }
+
+        function onClose(event) {
+            console.log('WebSocket connection closed');
+            setTimeout(initWebSocket, 2000);
+        }
+
+        function onMessage(event) {
+            var data = JSON.parse(event.data); // Parse the JSON data from ESP32
+            document.getElementById('lux').innerHTML = data.lux;
+
+            // Update LED status based on lux value
+            const ledStatus = document.getElementById('led-status');
+            if (data.lux < 400) {
+                ledStatus.innerHTML = "LED Status: ON";
+                ledStatus.classList.add('on');
+                ledStatus.classList.remove('off');
+            } else {
+                ledStatus.innerHTML = "LED Status: OFF";
+                ledStatus.classList.add('off');
+                ledStatus.classList.remove('on');
+            }
+        }
+    </script>
+</body>
+</html>
