@@ -1,11 +1,25 @@
 #include <esp_now.h>
 #include <WiFi.h>
+#include "../lib/BH1750FVI/src/BH1750FVI.h"
 
-int sensor = 34; // พินที่ใช้สำหรับเซ็นเซอร์น้ำ
-int val = 0;
+// กำหนดพินและตัวแปรสำหรับ Water Sensor
+int waterSensorPin = 34; // พินที่ใช้สำหรับเซ็นเซอร์น้ำ
+int waterVal = 0;
+
+// กำหนดพินและตัวแปรสำหรับ Light Sensor
+BH1750FVI LightSensor(BH1750FVI::k_DevModeContLowRes);
+int ledPin = 23; // พินควบคุม LED
+uint16_t lux = 0;
 
 // MAC address ของอุปกรณ์ที่รับ (เปลี่ยนตามจริง)
 uint8_t receiverMAC[] = {0x88, 0x13, 0xBF, 0x0D, 0x8F, 0x3C}; // ตัวอย่าง
+
+// โครงสร้างข้อมูลที่ส่งไปยังตัวรับ
+struct SensorData
+{
+  int waterLevel;
+  uint16_t lightIntensity;
+};
 
 // Callback เมื่อส่งข้อมูลเสร็จ
 void onSend(const uint8_t *macAddr, esp_now_send_status_t status)
@@ -16,7 +30,10 @@ void onSend(const uint8_t *macAddr, esp_now_send_status_t status)
 
 void setup()
 {
+  // การตั้งค่าสำหรับ Water Sensor และ Light Sensor
+  pinMode(ledPin, OUTPUT);
   Serial.begin(115200);
+  LightSensor.begin();
 
   // ตั้งค่า Wi-Fi โหมด Station
   WiFi.mode(WIFI_STA);
@@ -45,20 +62,44 @@ void setup()
 
 void loop()
 {
-  // อ่านค่าจาก water sensor
-  val = analogRead(sensor);
+  // อ่านค่าจาก Water Sensor
+  waterVal = analogRead(waterSensorPin);
+  Serial.print("Water Sensor Value: ");
+  Serial.println(waterVal);
 
-  // ส่งค่าไปยังตัวรับ
-  esp_err_t result = esp_now_send(receiverMAC, (uint8_t *)&val, sizeof(val));
+  // อ่านค่าจาก Light Sensor
+  lux = LightSensor.GetLightIntensity();
+  Serial.print("Light Sensor Value: ");
+  Serial.print(lux);
+  Serial.println(" lux");
 
-  if (result == ESP_OK)
+  // ควบคุม LED ตามค่าความสว่าง
+  if (lux < 400)
   {
-    Serial.print("Value sent: ");
-    Serial.println(val);
+    digitalWrite(ledPin, HIGH);
+    Serial.println("LED ON");
   }
   else
   {
-    Serial.println("Error sending value");
+    digitalWrite(ledPin, LOW);
+    Serial.println("LED OFF");
   }
-  delay(2000); // ส่งทุก 2 วินาที
+
+  // สร้างโครงสร้างข้อมูลสำหรับส่ง
+  SensorData data;
+  data.waterLevel = waterVal;
+  data.lightIntensity = lux;
+
+  // ส่งข้อมูลไปยังตัวรับ
+  esp_err_t result = esp_now_send(receiverMAC, (uint8_t *)&data, sizeof(data));
+  if (result == ESP_OK)
+  {
+    Serial.println("Data sent successfully");
+  }
+  else
+  {
+    Serial.println("Error sending data");
+  }
+
+  delay(2000); // ส่งข้อมูลทุก 2 วินาที
 }
