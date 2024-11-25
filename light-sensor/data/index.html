@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>ESP32 Light Sensor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-top: 50px;
+            font-size: 2.5em;
+        }
+
+        p {
+            font-size: 1.5em;
+            margin: 20px 0;
+        }
+
+        .button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-top: 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Current Light Intensity</h1>
+    <p id="light">Loading...</p>
+    <button class="button" onclick="getLightIntensity()">Get Light Intensity</button>
+
+    <script>
+        function getLightIntensity() {
+            fetch('/light')
+                .then((response) => response.text())
+                .then((data) => {
+                    document.getElementById('light').innerText = data + ' lux';
+                })
+                .catch((error) => {
+                    console.error('Error fetching light intensity:', error);
+                    document.getElementById('light').innerText = 'Error fetching data';
+                });
+        }
+        setInterval(getLightIntensity, 5000); // Fetch light intensity every 5 seconds
+    </script>
+</body>
+
+</html>
