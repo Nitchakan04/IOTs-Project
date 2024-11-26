@@ -1,41 +1,65 @@
-#include <esp_now.h>
-#include <WiFi.h>
+#define BLYNK_TEMPLATE_ID "TMPL6KGtHgx8M"
+#define BLYNK_TEMPLATE_NAME "luxlvl"
+#define BLYNK_AUTH_TOKEN "1lKex0q-RPGf0IED_l-tBtd62KX7VnNO"
 
-// โครงสร้างข้อมูลที่รับ
+#include <WiFi.h>
+#include <esp_now.h>
+#include <BlynkSimpleEsp32.h>
+
+// Wi-Fi Credentials
+// const char* ssid = "S22";
+// const char* password = "nawakorn";
+  const char* ssid = "Donut";
+  const char* password = "11111111";
+
+// Blynk Auth Token
+char auth[] = "1lKex0q-RPGf0IED_l-tBtd62KX7VnNO";  // Replace with your Blynk Auth Token
+
+// Structure to hold sensor data
 struct SensorData {
   int waterLevel;
   uint16_t lightIntensity;
 };
 
-// Callback เมื่อได้รับข้อมูล
-void onReceive(const uint8_t *macAddr, const uint8_t *incomingData, int len) {
-  SensorData receivedData;
-  memcpy(&receivedData, incomingData, sizeof(receivedData)); // ดึงข้อมูลจาก incomingData
+SensorData receivedData;
 
-  // แสดงค่าที่ได้รับใน Serial Monitor
-  Serial.print("Received Water Level: ");
-  Serial.println(receivedData.waterLevel);
-  Serial.print("Received Light Intensity: ");
-  Serial.println(receivedData.lightIntensity);
+// ESP-NOW Callback Function
+void onReceive(const uint8_t* macAddr, const uint8_t* incomingData, int len) {
+  memcpy(&receivedData, incomingData, sizeof(receivedData)); // Extract sensor data
+  Serial.printf("Received Water Level: %d, Light Intensity: %d\n", receivedData.waterLevel, receivedData.lightIntensity);
+
+  // Send data to Blynk
+  Blynk.virtualWrite(V0, receivedData.waterLevel);       // Send Water Level to Virtual Pin V1
+  Blynk.virtualWrite(V1, receivedData.lightIntensity);   // Send Light Intensity to Virtual Pin V2
 }
 
 void setup() {
   Serial.begin(115200);
 
-  // ตั้งค่า Wi-Fi โหมด Station
+  // Connect to Wi-Fi
   WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(1000);
+  }
+  Serial.println("\nConnected to WiFi");
+  Serial.printf("IP Address: %s\n", WiFi.localIP().toString().c_str());
 
-  // เริ่มต้น ESP-NOW
+  // Initialize Blynk
+  Blynk.begin(auth, ssid, password);
+  Serial.println("Blynk initialized");
+
+  // Initialize ESP-NOW
   if (esp_now_init() != ESP_OK) {
     Serial.println("ESP-NOW initialization failed!");
     return;
   }
-
-  // ลงทะเบียน callback เมื่อได้รับข้อมูล
   esp_now_register_recv_cb(onReceive);
   Serial.println("Receiver ready");
 }
 
 void loop() {
-  // รอรับข้อมูล
+  Blynk.run();  // Run Blynk
 }
