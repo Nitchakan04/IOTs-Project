@@ -3,8 +3,8 @@
 #include "../lib/BH1750FVI/src/BH1750FVI.h"
 
 // Wi-Fi Credentials
-const char* ssid = "Donut";
-const char* password = "11111111";
+const char* ssid = "PP";
+const char* password = "ppaaoo48";
 
 // กำหนดพินและตัวแปรสำหรับ Water Sensor
 int waterSensorPin = 34; // พินที่ใช้สำหรับเซ็นเซอร์น้ำ

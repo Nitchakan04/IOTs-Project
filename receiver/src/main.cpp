@@ -5,15 +5,17 @@
 #include <WiFi.h>
 #include <esp_now.h>
 #include <BlynkSimpleEsp32.h>
+#include <HTTPClient.h>
 
 // Wi-Fi Credentials
 // const char* ssid = "S22";
 // const char* password = "nawakorn";
-  const char* ssid = "Donut";
-  const char* password = "11111111";
+  const char* ssid = "PP";
+  const char* password = "ppaaoo48";
 
 // Blynk Auth Token
 char auth[] = "1lKex0q-RPGf0IED_l-tBtd62KX7VnNO";  // Replace with your Blynk Auth Token
+const char* GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwfGB9ultFj1AX1i6fI6URAjYX9Msc42i7QqhGeek7BausrYUuZOjSI7S-RaFu8hOiCvg/exec";
 
 // Structure to hold sensor data
 struct SensorData {
@@ -21,7 +23,7 @@ struct SensorData {
   uint16_t lightIntensity;
 };
 
-SensorData receivedData;
+static SensorData receivedData;
 
 // ESP-NOW Callback Function
 void onReceive(const uint8_t* macAddr, const uint8_t* incomingData, int len) {
@@ -31,6 +33,25 @@ void onReceive(const uint8_t* macAddr, const uint8_t* incomingData, int len) {
   // Send data to Blynk
   Blynk.virtualWrite(V0, receivedData.waterLevel);       // Send Water Level to Virtual Pin V1
   Blynk.virtualWrite(V1, receivedData.lightIntensity);   // Send Light Intensity to Virtual Pin V2
+
+}
+
+void sendToGoogleSheets(int waterLevel, int lightIntensity) {
+  HTTPClient http;
+
+  // Create the URL with parameters
+  String url = String(GOOGLE_SCRIPT_URL) + "?value1=" + String(waterLevel) + "&value2=" + String(lightIntensity);
+
+  http.begin(url);  // Initialize HTTP request
+  int httpCode = http.GET();  // Send GET request
+
+  if (httpCode > 0) {
+    Serial.printf("Data sent to Google Sheets. HTTP Response: %d\n", httpCode);
+  } else {
+    Serial.printf("Error sending to Google Sheets: %s\n", http.errorToString(httpCode).c_str());
+  }
+
+  http.end();  // Close connection
 }
 
 void setup() {
@@ -58,8 +79,16 @@ void setup() {
   }
   esp_now_register_recv_cb(onReceive);
   Serial.println("Receiver ready");
+
+  Serial.println("Ready to send data to Google Sheets.");
 }
 
 void loop() {
   Blynk.run();  // Run Blynk
+
+  // Send data to Google Sheets
+  sendToGoogleSheets(receivedData.waterLevel, receivedData.lightIntensity);
+
+  delay(1000);
+
 }
