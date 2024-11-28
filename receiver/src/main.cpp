@@ -8,14 +8,63 @@
 #include <HTTPClient.h>
 
 // Wi-Fi Credentials
-// const char* ssid = "S22";
-// const char* password = "nawakorn";
-  const char* ssid = "PP";
-  const char* password = "ppaaoo48";
+  const char* ssid = "Donut";
+  const char* password = "11111111";
 
 // Blynk Auth Token
 char auth[] = "1lKex0q-RPGf0IED_l-tBtd62KX7VnNO";  // Replace with your Blynk Auth Token
-const char* GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwfGB9ultFj1AX1i6fI6URAjYX9Msc42i7QqhGeek7BausrYUuZOjSI7S-RaFu8hOiCvg/exec";
+
+// Thermistor Constants
+#define RT0 10000       // Ω
+#define B 3977          // K
+#define VCC 3.3         // Supply voltage
+#define R 10000         // Fixed resistor value (10KΩ)
+#define SENSOR_PIN 34   // Thermistor ADC pin
+
+// TDS Sensor Constants
+#define TdsSensorPin 33 // TDS ADC pin
+#define VREF 3.3        // Analog reference voltage (ESP32 = 3.3V)
+#define SCOUNT 10       // Number of samples for TDS
+
+// Thermistor Variables
+float RT, VR, ln, Temp, T0_temp, Read;
+
+// TDS Sensor Variables
+int analogBuffer[SCOUNT];       // Buffer for TDS ADC readings
+int analogBufferTemp[SCOUNT];   // Temporary buffer for sorting
+int analogBufferIndex = 0, copyIndex = 0;
+float averageVoltage = 0, tdsValue = 0;
+
+// Timing Variable
+unsigned long lastMeasurementTime = 0;
+
+// Function to calculate median
+int getMedianNum(int bArray[], int iFilterLen)
+{
+  int bTab[iFilterLen];
+  for (byte i = 0; i < iFilterLen; i++)
+    bTab[i] = bArray[i];
+  int i, j, bTemp;
+  for (j = 0; j < iFilterLen - 1; j++)
+  {
+    for (i = 0; i < iFilterLen - j - 1; i++)
+    {
+      if (bTab[i] > bTab[i + 1])
+      {
+        bTemp = bTab[i];
+        bTab[i] = bTab[i + 1];
+        bTab[i + 1] = bTemp;
+      }
+    }
+  }
+  if ((iFilterLen & 1) > 0)
+    bTemp = bTab[(iFilterLen - 1) / 2];
+  else
+    bTemp = (bTab[iFilterLen / 2] + bTab[iFilterLen / 2 - 1]) / 2;
+  return bTemp;
+}
+
+// Sensor Variables
 
 // Structure to hold sensor data
 struct SensorData {
@@ -24,38 +73,75 @@ struct SensorData {
 };
 
 static SensorData receivedData;
+bool newDataReceived = false;
+
+struct EspData {
+  double temperature;
+  double tdsValue;
+};
+
+EspData calcTsdTemp() {
+  Read = analogRead(SENSOR_PIN); // Read ADC value
+    Read = (VCC / 4095.0) * Read;  // Convert ADC to voltage
+    VR = VCC - Read;
+    RT = Read / (VR / R);          // Calculate resistance
+
+    ln = log(RT / RT0);
+    Temp = (1 / ((ln / B) + (1 / T0_temp))); // Temperature in Kelvin
+    Temp = Temp - 273.15;                   // Convert to Celsius
+
+    // 2. Read and Process TDS Sensor Data
+    for (int i = 0; i < SCOUNT; i++)
+    {
+      analogBuffer[i] = analogRead(TdsSensorPin);
+    }
+
+    for (copyIndex = 0; copyIndex < SCOUNT; copyIndex++)
+      analogBufferTemp[copyIndex] = analogBuffer[copyIndex];
+
+    averageVoltage = getMedianNum(analogBufferTemp, SCOUNT) * (float)VREF / 4095.0;
+    float compensationCoefficient = 1.0 + 0.02 * (Temp - 25.0); // Temperature compensation
+    float compensationVoltage = averageVoltage / compensationCoefficient;
+    tdsValue = (133.42 * compensationVoltage * compensationVoltage * compensationVoltage
+                - 255.86 * compensationVoltage * compensationVoltage
+                + 857.39 * compensationVoltage) * 0.5;
+
+    // Print Temperature and TDS Value
+    Serial.print("Temperature: ");
+    Serial.print(Temp, 2); // Celsius
+    Serial.print(" C\t");
+
+    Serial.print("TDS Value: ");
+    Serial.print(tdsValue, 0); // TDS in ppm
+    Serial.println(" ppm");
+
+    EspData espData;
+    espData.tdsValue = tdsValue;
+    espData.temperature = Temp;
+    return espData;
+}
 
 // ESP-NOW Callback Function
 void onReceive(const uint8_t* macAddr, const uint8_t* incomingData, int len) {
   memcpy(&receivedData, incomingData, sizeof(receivedData)); // Extract sensor data
-  Serial.printf("Received Water Level: %d, Light Intensity: %d\n", receivedData.waterLevel, receivedData.lightIntensity);
+  // Serial.printf("Received Water Level: %d, Light Intensity: %d\n", receivedData.waterLevel, receivedData.lightIntensity);
 
   // Send data to Blynk
+  EspData espData = calcTsdTemp();
+  Blynk.virtualWrite(V2, espData.temperature);
+  Blynk.virtualWrite(V3, espData.tdsValue);
   Blynk.virtualWrite(V0, receivedData.waterLevel);       // Send Water Level to Virtual Pin V1
   Blynk.virtualWrite(V1, receivedData.lightIntensity);   // Send Light Intensity to Virtual Pin V2
-
-}
-
-void sendToGoogleSheets(int waterLevel, int lightIntensity) {
-  HTTPClient http;
-
-  // Create the URL with parameters
-  String url = String(GOOGLE_SCRIPT_URL) + "?value1=" + String(waterLevel) + "&value2=" + String(lightIntensity);
-
-  http.begin(url);  // Initialize HTTP request
-  int httpCode = http.GET();  // Send GET request
-
-  if (httpCode > 0) {
-    Serial.printf("Data sent to Google Sheets. HTTP Response: %d\n", httpCode);
-  } else {
-    Serial.printf("Error sending to Google Sheets: %s\n", http.errorToString(httpCode).c_str());
-  }
-
-  http.end();  // Close connection
+  Serial.printf("Temperature: %.2f C, TDS: %.2f ppm\n", espData.temperature, espData.tdsValue);
+  Serial.printf("Water Level: %d, Light Intensity: %d\n", receivedData.waterLevel, receivedData.lightIntensity);
 }
 
 void setup() {
   Serial.begin(115200);
+
+  pinMode(SENSOR_PIN, INPUT);
+  pinMode(TdsSensorPin, INPUT);
+  T0_temp = 25 + 273.15; // Reference temperature in Kelvin
 
   // Connect to Wi-Fi
   WiFi.mode(WIFI_STA);
@@ -80,15 +166,10 @@ void setup() {
   esp_now_register_recv_cb(onReceive);
   Serial.println("Receiver ready");
 
-  Serial.println("Ready to send data to Google Sheets.");
+  Serial.println("Ready to send data.");
 }
 
 void loop() {
   Blynk.run();  // Run Blynk
-
-  // Send data to Google Sheets
-  sendToGoogleSheets(receivedData.waterLevel, receivedData.lightIntensity);
-
   delay(1000);
-
 }
