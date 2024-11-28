@@ -13,6 +13,7 @@
 
 // Blynk Auth Token
 char auth[] = "1lKex0q-RPGf0IED_l-tBtd62KX7VnNO";  // Replace with your Blynk Auth Token
+const char* GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbytpXNTXvF9Jun-6WfARvI6Ex7ADbducSU5DFHu-zc2f3pkPs-ljn6uXCCSnb4zUUlvxg/exec";
 
 // Thermistor Constants
 #define RT0 10000       // Ω
@@ -80,6 +81,8 @@ struct EspData {
   double tdsValue;
 };
 
+EspData espData;
+
 EspData calcTsdTemp() {
   Read = analogRead(SENSOR_PIN); // Read ADC value
     Read = (VCC / 4095.0) * Read;  // Convert ADC to voltage
@@ -106,16 +109,6 @@ EspData calcTsdTemp() {
                 - 255.86 * compensationVoltage * compensationVoltage
                 + 857.39 * compensationVoltage) * 0.5;
 
-    // Print Temperature and TDS Value
-    Serial.print("Temperature: ");
-    Serial.print(Temp, 2); // Celsius
-    Serial.print(" C\t");
-
-    Serial.print("TDS Value: ");
-    Serial.print(tdsValue, 0); // TDS in ppm
-    Serial.println(" ppm");
-
-    EspData espData;
     espData.tdsValue = tdsValue;
     espData.temperature = Temp;
     return espData;
@@ -127,13 +120,33 @@ void onReceive(const uint8_t* macAddr, const uint8_t* incomingData, int len) {
   // Serial.printf("Received Water Level: %d, Light Intensity: %d\n", receivedData.waterLevel, receivedData.lightIntensity);
 
   // Send data to Blynk
-  EspData espData = calcTsdTemp();
+  espData = calcTsdTemp();
   Blynk.virtualWrite(V2, espData.temperature);
   Blynk.virtualWrite(V3, espData.tdsValue);
   Blynk.virtualWrite(V0, receivedData.waterLevel);       // Send Water Level to Virtual Pin V1
   Blynk.virtualWrite(V1, receivedData.lightIntensity);   // Send Light Intensity to Virtual Pin V2
-  Serial.printf("Temperature: %.2f C, TDS: %.2f ppm\n", espData.temperature, espData.tdsValue);
-  Serial.printf("Water Level: %d, Light Intensity: %d\n", receivedData.waterLevel, receivedData.lightIntensity);
+  Serial.printf("Temperature: %.2f C, TDS: %.2f ppm, Water Level: %d, Light Intensity: %d\n", espData.temperature, espData.tdsValue, receivedData.waterLevel, receivedData.lightIntensity);
+}
+
+void sendToGoogleSheets(int waterLevel, int lightIntensity, float temperature, float tdsValue) {
+  HTTPClient http;
+
+  // Create the URL with parameters
+  String url = String(GOOGLE_SCRIPT_URL) + "?value1=" + String(waterLevel) +
+               "&value2=" + String(lightIntensity) +
+               "&value3=" + String(temperature, 2) +
+               "&value4=" + String(tdsValue, 2);
+
+  http.begin(url);  // Initialize HTTP request
+  int httpCode = http.GET();  // Send GET request
+
+  if (httpCode > 0) {
+    Serial.printf("Data sent to Google Sheets. HTTP Response: %d\n", httpCode);
+  } else {
+    Serial.printf("Error sending to Google Sheets: %s\n", http.errorToString(httpCode).c_str());
+  }
+
+  http.end();  // Close connection
 }
 
 void setup() {
@@ -170,6 +183,17 @@ void setup() {
 }
 
 void loop() {
-  Blynk.run();  // Run Blynk
-  delay(1000);
+  Blynk.run();  // Ensure Blynk updates happen in real time
+
+  // Get the current time
+  static unsigned long lastGoogleSheetUpdate = 0; // Tracks the last time data was sent to Google Sheets
+  unsigned long currentMillis = millis();
+
+  // Send data to Google Sheets every 5000 milliseconds (5 seconds)
+  if (currentMillis - lastGoogleSheetUpdate >= 5000) {
+    lastGoogleSheetUpdate = currentMillis;
+
+    // Send data to Google Sheets
+    sendToGoogleSheets(receivedData.waterLevel, receivedData.lightIntensity, espData.temperature, espData.tdsValue);
+  }
 }

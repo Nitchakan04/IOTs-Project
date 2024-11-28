@@ -3,8 +3,8 @@
 #include "../lib/BH1750FVI/src/BH1750FVI.h"
 
 // Wi-Fi Credentials
-const char* ssid = "PP";
-const char* password = "ppaaoo48";
+const char* ssid = "Donut";
+const char* password = "11111111";
 
 // กำหนดพินและตัวแปรสำหรับ Water Sensor
 int waterSensorPin = 34; // พินที่ใช้สำหรับเซ็นเซอร์น้ำ
@@ -119,5 +119,5 @@ void loop()
     Serial.println("Error sending data");
   }
 
-  delay(1000); // ส่งข้อมูลทุก 2 วินาที
+  delay(1000);
 }
