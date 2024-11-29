@@ -3,8 +3,8 @@
 #include "../lib/BH1750FVI/src/BH1750FVI.h"
 
 // Wi-Fi Credentials
-const char* ssid = "Donut";
-const char* password = "11111111";
+const char *ssid = "PP";
+const char *password = "ppaaoo48";
 
 // กำหนดพินและตัวแปรสำหรับ Water Sensor
 int waterSensorPin = 34; // พินที่ใช้สำหรับเซ็นเซอร์น้ำ
@@ -44,7 +44,8 @@ void setup()
 
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     Serial.print(".");
     delay(1000);
   }
@@ -94,12 +95,12 @@ void loop()
   // ควบคุม LED ตามค่าความสว่าง
   if (lux < 400)
   {
-    digitalWrite(ledPin, HIGH);
+    digitalWrite(ledPin, HIGH); // สั่งให้ LED สว่าง
     Serial.println("LED ON");
   }
-  else
+  if (lux > 400)
   {
-    digitalWrite(ledPin, LOW);
+    digitalWrite(ledPin, LOW); // สั่งให้ LED ดับ
     Serial.println("LED OFF");
   }
 

@@ -8,8 +8,8 @@
 #include <HTTPClient.h>
 
 // Wi-Fi Credentials
-const char* ssid = "Donut";
-const char* password = "11111111";
+const char* ssid = "pp";
+const char* password = "ppaaoo48";
 
 // Blynk Auth Token
 char auth[] = BLYNK_AUTH_TOKEN;  // Replace with your Blynk Auth Token
