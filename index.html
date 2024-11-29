@@ -12,19 +12,9 @@
     <header>ระบบแสดงคุณภาพน้ำในตู้ปลา</header>
     <div class="main-content">
         <!-- วิดีโอ -->
-        <!-- <div class="video-container">
-            <video id="camera-stream" autoplay muted playsinline controls>
-                <source src="http://<IP-ADDRESS>:<PORT>/video" type="video/mp4">
-                วิดีโอนี้ไม่รองรับในเบราว์เซอร์ของคุณ
-            </video>
-        </div> -->
-
-        
         <div class="video-container">
             <iframe id="camera-stream" src="http://192.168.192.247" title="Camera Stream" allowfullscreen></iframe>
         </div>
-        
-        
 
         <!-- ไฟ -->
         <div class="light-container">
@@ -45,7 +35,6 @@
             </div>
         </div>
         
-        
         <!-- ค่าพารามิเตอร์ -->
         <div class="parameters-container">
             <div class="parameter">
@@ -53,7 +42,7 @@
                 <p class="value" id="temperature">--</p>
             </div>
             <div class="parameter">
-                <h3>คุณภาพน้ำ (ppm)</h3>
+                <h3>TDS (ppm)</h3>
                 <p class="value" id="tds">--</p>
             </div>
             <div class="parameter">
@@ -70,6 +59,7 @@
             </div>
         </div>
     </div>
+
     <script src="myscripts.js"></script>
 </body>
 

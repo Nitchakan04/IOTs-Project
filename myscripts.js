@@ -137,3 +137,39 @@ setInterval(fetchSensorData, 3000);
 
 // เรียกฟังก์ชันดึงข้อมูลเซนเซอร์ครั้งแรก
 fetchSensorData();
+
+
+//----------------------------------------------------------------------------------
+// Replace with your Blynk Auth Token
+const authToken = 'nPlod4N5_OwUKZmhRstb_9BvLH6OIsJQ';
+
+// Map virtual pins to their corresponding element IDs
+const blynkDataMapping = {
+
+    'water-level': 'v0',
+    light: 'v1',
+    temperature: 'v2',
+    tds: 'v3'
+};
+
+// Fetch data from Blynk API
+function fetchBlynkData() {
+    for (const [key, pin] of Object.entries(blynkDataMapping)) {
+        const apiUrl = `https://blynk.cloud/external/api/get?token=${authToken}&${pin}`;
+        
+        fetch(apiUrl)
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById(key).innerText = data;
+            })
+            .catch(error => {
+                console.error(`Error fetching data for ${key}:`, error);
+            });
+    }
+}
+
+// Fetch data on page load
+window.onload = fetchBlynkData;
+
+// Refresh data every 5 seconds
+setInterval(fetchBlynkData, 5000);
