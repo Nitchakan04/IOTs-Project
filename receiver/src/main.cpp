@@ -1,6 +1,6 @@
-#define BLYNK_TEMPLATE_ID "TMPL6KGtHgx8M"
-#define BLYNK_TEMPLATE_NAME "luxlvl"
-#define BLYNK_AUTH_TOKEN "1lKex0q-RPGf0IED_l-tBtd62KX7VnNO"
+#define BLYNK_TEMPLATE_ID "TMPL6y5pk9mCa"
+#define BLYNK_TEMPLATE_NAME "Sensor Data"
+#define BLYNK_AUTH_TOKEN "nPlod4N5_OwUKZmhRstb_9BvLH6OIsJQ"
 
 #include <WiFi.h>
 #include <esp_now.h>
@@ -8,12 +8,13 @@
 #include <HTTPClient.h>
 
 // Wi-Fi Credentials
-  const char* ssid = "Donut";
-  const char* password = "11111111";
+const char* ssid = "Donut";
+const char* password = "11111111";
 
 // Blynk Auth Token
-char auth[] = "1lKex0q-RPGf0IED_l-tBtd62KX7VnNO";  // Replace with your Blynk Auth Token
+char auth[] = BLYNK_AUTH_TOKEN;  // Replace with your Blynk Auth Token
 const char* GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbytpXNTXvF9Jun-6WfARvI6Ex7ADbducSU5DFHu-zc2f3pkPs-ljn6uXCCSnb4zUUlvxg/exec";
+const char* LINE_NOTIFY_TOKEN = "kZbwzGeFqTgkXFt4GDtiMR4PkxdTvTYQ3WIcdBjwX6I";
 
 // Thermistor Constants
 #define RT0 10000       // Ω
@@ -149,6 +150,29 @@ void sendToGoogleSheets(int waterLevel, int lightIntensity, float temperature, f
   http.end();  // Close connection
 }
 
+void sendLineNotify(String message) {
+  HTTPClient http;
+
+  // Line Notify API endpoint
+  String url = "https://notify-api.line.me/api/notify";
+
+  http.begin(url);
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  http.addHeader("Authorization", "Bearer " + String(LINE_NOTIFY_TOKEN));
+
+  // Send POST request with the message
+  String payload = "message=" + message;
+  int httpCode = http.POST(payload);
+
+  if (httpCode > 0) {
+    Serial.printf("Line Notify Response: %d, %s\n", httpCode, http.getString().c_str());
+  } else {
+    Serial.printf("Line Notify Error: %s\n", http.errorToString(httpCode).c_str());
+  }
+
+  http.end();  // Close connection
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -186,7 +210,8 @@ void loop() {
   Blynk.run();  // Ensure Blynk updates happen in real time
 
   // Get the current time
-  static unsigned long lastGoogleSheetUpdate = 0; // Tracks the last time data was sent to Google Sheets
+  static unsigned long lastGoogleSheetUpdate = 0;  // Tracks the last time data was sent to Google Sheets
+  static unsigned long lastLineNotify = 0;         // Tracks the last time Line Notify was sent
   unsigned long currentMillis = millis();
 
   // Send data to Google Sheets every 5000 milliseconds (5 seconds)
@@ -195,5 +220,24 @@ void loop() {
 
     // Send data to Google Sheets
     sendToGoogleSheets(receivedData.waterLevel, receivedData.lightIntensity, espData.temperature, espData.tdsValue);
+  }
+
+  // Check if thresholds are exceeded for Line Notify
+  if ((receivedData.lightIntensity > 1000 || espData.tdsValue > 500 || espData.temperature > 45) &&
+      (currentMillis - lastLineNotify >= 20000)) {  // Avoid spamming notifications, limit to 1 per minute
+    lastLineNotify = currentMillis;
+
+    String message = "Warning!\n";
+    if (espData.temperature > 45) {
+      message += "Temperature: " + String(espData.temperature, 2) + "°C\n";
+    }
+    if (espData.tdsValue > 500) {
+      message += "TDS: " + String(espData.tdsValue, 2) + " ppm\n";
+    }
+    if (receivedData.lightIntensity > 1000) {
+      message += "Light Intensity: " + String(receivedData.lightIntensity) + " lux\n";
+    }
+    sendLineNotify(message);  // Send the notification
+    Serial.println(message);
   }
 }
