@@ -36,13 +36,12 @@ header {
 
 .video-container {
     width: 60%; /* ความกว้างเป็น 60% ของพื้นที่เว็บ */
-    max-width: 800px; /* ความกว้างสูงสุด 800px */
+    max-width: 400px; /* ความกว้างสูงสุด 800px */
     margin: 0 auto; /* จัดกึ่งกลางในแนวนอน */
     position: relative;
-    padding-top: 35%; /* อัตราส่วน 16:9 */
+    padding-top: 21.5%; /* อัตราส่วน 16:9 */
     border-radius: 15px; /* ทำขอบมน */
     overflow: hidden; /* ตัดส่วนที่เกินออก */
-    background: #000; /* เพิ่มพื้นหลังสีดำ */
   }
   
   #camera-stream {
