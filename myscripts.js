@@ -25,13 +25,40 @@ function fetchBlynkData() {
   }
 }
 
-// Fetch data on page load
-window.onload = fetchBlynkData;
 
-// Refresh data every 5 seconds
+// Fetch the last row from Google Sheets (Column C)
+async function fetchGoogleSheetData() {
+  const apiKey = "YOUR_GOOGLE_API_KEY"; // ใส่ API Key ที่ได้จาก Google
+  const spreadsheetId = "https://script.google.com/macros/s/AKfycbxWHcuErArFnfKnWIhJ8Kj4ZLaj0oCDnYoESF_VHLiS2ylDMPVl8g5I3g0J91RsDEb1Pg/exec"; // ใส่ Spreadsheet ID
+  const range = "C:C"; // ระบุช่วงคอลัมน์ C
+
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?key=${apiKey}`;
+  try {
+      const response = await fetch(url);
+      const data = await response.json();
+      const values = data.values;
+
+      if (values && values.length > 0) {
+          // ดึงข้อมูลจากแถวล่างสุดของคอลัมน์ C
+          const lastRow = values[values.length - 1][0];
+          document.getElementById("animals").innerText = lastRow;
+      } else {
+          console.error("No data found in the specified range.");
+      }
+  } catch (error) {
+      console.error("Error fetching Google Sheets data:", error);
+  }
+}
+
+
+ // Fetch data on page load
+ window.onload = () => {
+  fetchBlynkData();
+  fetchGoogleSheetData();
+};
+
+// Refresh Blynk data every 5 seconds
 setInterval(fetchBlynkData, 5000);
-
-
 
 //----------------------------------------------------------------------------------------------------------
 // ฟังก์ชันเปลี่ยนสถานะไฟ

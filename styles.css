@@ -113,6 +113,12 @@ header {
     font-size: 1.3em;
 }
 
+.parameter h1 {
+    margin: 0 0 10px;
+    font-size: 2.3em;
+    color: #0288d1;
+}
+
 .value {
     font-size: 2.5em;
     color: #0288d1;
