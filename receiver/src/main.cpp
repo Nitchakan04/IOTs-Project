@@ -1,6 +1,6 @@
-#define BLYNK_TEMPLATE_ID "TMPL6y5pk9mCa"
-#define BLYNK_TEMPLATE_NAME "Sensor Data"
-#define BLYNK_AUTH_TOKEN "nPlod4N5_OwUKZmhRstb_9BvLH6OIsJQ"
+#define BLYNK_TEMPLATE_ID "TMPL6zwT9xdLy"
+#define BLYNK_TEMPLATE_NAME "Aquarium V3"
+#define BLYNK_AUTH_TOKEN "sTTC4swZaaT5HmNssLdOVN02XzSEvurD"
 
 #include <WiFi.h>
 #include <esp_now.h>
@@ -8,7 +8,7 @@
 #include <HTTPClient.h>
 
 // Wi-Fi Credentials
-const char* ssid = "pp";
+const char* ssid = "PP";
 const char* password = "ppaaoo48";
 
 // Blynk Auth Token
@@ -92,7 +92,7 @@ EspData calcTsdTemp() {
 
     ln = log(RT / RT0);
     Temp = (1 / ((ln / B) + (1 / T0_temp))); // Temperature in Kelvin
-    Temp = Temp - 273.15;                   // Convert to Celsius
+    Temp = Temp - 273.15 -5.0;                   // Convert to Celsius
 
     // 2. Read and Process TDS Sensor Data
     for (int i = 0; i < SCOUNT; i++)
@@ -223,19 +223,30 @@ void loop() {
   }
 
   // Check if thresholds are exceeded for Line Notify
-  if ((receivedData.lightIntensity > 1000 || espData.tdsValue > 500 || espData.temperature > 45) &&
-      (currentMillis - lastLineNotify >= 20000)) {  // Avoid spamming notifications, limit to 1 per minute
+  if ((receivedData.lightIntensity > 1000 || espData.tdsValue > 500 || espData.temperature > 33 || espData.temperature < 24 || receivedData.waterLevel == 0) &&
+      (currentMillis - lastLineNotify >= 10000)) {  
     lastLineNotify = currentMillis;
 
     String message = "Warning!\n";
-    if (espData.temperature > 45) {
+    if (espData.temperature > 33) {
       message += "Temperature: " + String(espData.temperature, 2) + "°C\n";
+      message += "The water temperature is too HIGH for aquatic animals. Please change water immediately.\n\n";
+    }
+    if (espData.temperature < 24) {
+      message += "Temperature: " + String(espData.temperature, 2) + "°C\n";
+      message += "The water temperature is too LOW for aquatic animals. Please change water immediately.\n\n";
     }
     if (espData.tdsValue > 500) {
       message += "TDS: " + String(espData.tdsValue, 2) + " ppm\n";
+      message += "Water quality is too LOW for aquatic animals. Please change water immediately.\n\n";
     }
     if (receivedData.lightIntensity > 1000) {
       message += "Light Intensity: " + String(receivedData.lightIntensity) + " lux\n";
+      message += "Light intensity is too HIGH for aquatic animals. Please lower immediately.\n\n";
+    }
+    if (receivedData.waterLevel == 0) {
+      message += "Water Level: " + String(receivedData.waterLevel) + "\n";
+      message += "Water level is too LOW for aquatic animals. Please fill water immediately.\n\n";
     }
     sendLineNotify(message);  // Send the notification
     Serial.println(message);
