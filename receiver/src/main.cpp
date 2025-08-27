@@ -1,254 +1,124 @@
-#define BLYNK_TEMPLATE_ID "TMPL6zwT9xdLy"
-#define BLYNK_TEMPLATE_NAME "Aquarium V3"
-#define BLYNK_AUTH_TOKEN "sTTC4swZaaT5HmNssLdOVN02XzSEvurD"
-
-#include <WiFi.h>
 #include <esp_now.h>
-#include <BlynkSimpleEsp32.h>
-#include <HTTPClient.h>
+#include <WiFi.h>
+#include "../lib/BH1750FVI/src/BH1750FVI.h"
 
 // Wi-Fi Credentials
-const char* ssid = "PP";
-const char* password = "ppaaoo48";
+const char *ssid = "PP";
+const char *password = "ppaaoo48";
 
-// Blynk Auth Token
-char auth[] = BLYNK_AUTH_TOKEN;  // Replace with your Blynk Auth Token
-const char* GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbytpXNTXvF9Jun-6WfARvI6Ex7ADbducSU5DFHu-zc2f3pkPs-ljn6uXCCSnb4zUUlvxg/exec";
-const char* LINE_NOTIFY_TOKEN = "kZbwzGeFqTgkXFt4GDtiMR4PkxdTvTYQ3WIcdBjwX6I";
+// กำหนดพินและตัวแปรสำหรับ Water Sensor
+int waterSensorPin = 34; // พินที่ใช้สำหรับเซ็นเซอร์น้ำ
+int waterVal = 0;
 
-// Thermistor Constants
-#define RT0 10000       // Ω
-#define B 3977          // K
-#define VCC 3.3         // Supply voltage
-#define R 10000         // Fixed resistor value (10KΩ)
-#define SENSOR_PIN 34   // Thermistor ADC pin
+// กำหนดพินและตัวแปรสำหรับ Light Sensor
+BH1750FVI LightSensor(BH1750FVI::k_DevModeContLowRes);
+int ledPin = 23; // พินควบคุม LED
+uint16_t lux = 0;
 
-// TDS Sensor Constants
-#define TdsSensorPin 33 // TDS ADC pin
-#define VREF 3.3        // Analog reference voltage (ESP32 = 3.3V)
-#define SCOUNT 10       // Number of samples for TDS
+// MAC address ของอุปกรณ์ที่รับ (เปลี่ยนตามจริง)
+uint8_t receiverMAC[] = {0x88, 0x13, 0xBF, 0x0D, 0x8F, 0x3C}; // ตัวอย่าง
 
-// Thermistor Variables
-float RT, VR, ln, Temp, T0_temp, Read;
-
-// TDS Sensor Variables
-int analogBuffer[SCOUNT];       // Buffer for TDS ADC readings
-int analogBufferTemp[SCOUNT];   // Temporary buffer for sorting
-int analogBufferIndex = 0, copyIndex = 0;
-float averageVoltage = 0, tdsValue = 0;
-
-// Timing Variable
-unsigned long lastMeasurementTime = 0;
-
-// Function to calculate median
-int getMedianNum(int bArray[], int iFilterLen)
+// โครงสร้างข้อมูลที่ส่งไปยังตัวรับ
+struct SensorData
 {
-  int bTab[iFilterLen];
-  for (byte i = 0; i < iFilterLen; i++)
-    bTab[i] = bArray[i];
-  int i, j, bTemp;
-  for (j = 0; j < iFilterLen - 1; j++)
-  {
-    for (i = 0; i < iFilterLen - j - 1; i++)
-    {
-      if (bTab[i] > bTab[i + 1])
-      {
-        bTemp = bTab[i];
-        bTab[i] = bTab[i + 1];
-        bTab[i + 1] = bTemp;
-      }
-    }
-  }
-  if ((iFilterLen & 1) > 0)
-    bTemp = bTab[(iFilterLen - 1) / 2];
-  else
-    bTemp = (bTab[iFilterLen / 2] + bTab[iFilterLen / 2 - 1]) / 2;
-  return bTemp;
-}
-
-// Sensor Variables
-
-// Structure to hold sensor data
-struct SensorData {
   int waterLevel;
   uint16_t lightIntensity;
 };
 
-static SensorData receivedData;
-bool newDataReceived = false;
-
-struct EspData {
-  double temperature;
-  double tdsValue;
-};
-
-EspData espData;
-
-EspData calcTsdTemp() {
-  Read = analogRead(SENSOR_PIN); // Read ADC value
-    Read = (VCC / 4095.0) * Read;  // Convert ADC to voltage
-    VR = VCC - Read;
-    RT = Read / (VR / R);          // Calculate resistance
-
-    ln = log(RT / RT0);
-    Temp = (1 / ((ln / B) + (1 / T0_temp))); // Temperature in Kelvin
-    Temp = Temp - 273.15 -5.0;                   // Convert to Celsius
-
-    // 2. Read and Process TDS Sensor Data
-    for (int i = 0; i < SCOUNT; i++)
-    {
-      analogBuffer[i] = analogRead(TdsSensorPin);
-    }
-
-    for (copyIndex = 0; copyIndex < SCOUNT; copyIndex++)
-      analogBufferTemp[copyIndex] = analogBuffer[copyIndex];
-
-    averageVoltage = getMedianNum(analogBufferTemp, SCOUNT) * (float)VREF / 4095.0;
-    float compensationCoefficient = 1.0 + 0.02 * (Temp - 25.0); // Temperature compensation
-    float compensationVoltage = averageVoltage / compensationCoefficient;
-    tdsValue = (133.42 * compensationVoltage * compensationVoltage * compensationVoltage
-                - 255.86 * compensationVoltage * compensationVoltage
-                + 857.39 * compensationVoltage) * 0.5;
-
-    espData.tdsValue = tdsValue;
-    espData.temperature = Temp;
-    return espData;
+// Callback เมื่อส่งข้อมูลเสร็จ
+void onSend(const uint8_t *macAddr, esp_now_send_status_t status)
+{
+  Serial.print("Send Status: ");
+  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
 }
 
-// ESP-NOW Callback Function
-void onReceive(const uint8_t* macAddr, const uint8_t* incomingData, int len) {
-  memcpy(&receivedData, incomingData, sizeof(receivedData)); // Extract sensor data
-  // Serial.printf("Received Water Level: %d, Light Intensity: %d\n", receivedData.waterLevel, receivedData.lightIntensity);
-
-  // Send data to Blynk
-  espData = calcTsdTemp();
-  Blynk.virtualWrite(V2, espData.temperature);
-  Blynk.virtualWrite(V3, espData.tdsValue);
-  Blynk.virtualWrite(V0, receivedData.waterLevel);       // Send Water Level to Virtual Pin V1
-  Blynk.virtualWrite(V1, receivedData.lightIntensity);   // Send Light Intensity to Virtual Pin V2
-  Serial.printf("Temperature: %.2f C, TDS: %.2f ppm, Water Level: %d, Light Intensity: %d\n", espData.temperature, espData.tdsValue, receivedData.waterLevel, receivedData.lightIntensity);
-}
-
-void sendToGoogleSheets(int waterLevel, int lightIntensity, float temperature, float tdsValue) {
-  HTTPClient http;
-
-  // Create the URL with parameters
-  String url = String(GOOGLE_SCRIPT_URL) + "?value1=" + String(waterLevel) +
-               "&value2=" + String(lightIntensity) +
-               "&value3=" + String(temperature, 2) +
-               "&value4=" + String(tdsValue, 2);
-
-  http.begin(url);  // Initialize HTTP request
-  int httpCode = http.GET();  // Send GET request
-
-  if (httpCode > 0) {
-    Serial.printf("Data sent to Google Sheets. HTTP Response: %d\n", httpCode);
-  } else {
-    Serial.printf("Error sending to Google Sheets: %s\n", http.errorToString(httpCode).c_str());
-  }
-
-  http.end();  // Close connection
-}
-
-void sendLineNotify(String message) {
-  HTTPClient http;
-
-  // Line Notify API endpoint
-  String url = "https://notify-api.line.me/api/notify";
-
-  http.begin(url);
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  http.addHeader("Authorization", "Bearer " + String(LINE_NOTIFY_TOKEN));
-
-  // Send POST request with the message
-  String payload = "message=" + message;
-  int httpCode = http.POST(payload);
-
-  if (httpCode > 0) {
-    Serial.printf("Line Notify Response: %d, %s\n", httpCode, http.getString().c_str());
-  } else {
-    Serial.printf("Line Notify Error: %s\n", http.errorToString(httpCode).c_str());
-  }
-
-  http.end();  // Close connection
-}
-
-void setup() {
+void setup()
+{
+  // การตั้งค่าสำหรับ Water Sensor และ Light Sensor
+  pinMode(ledPin, OUTPUT);
   Serial.begin(115200);
+  LightSensor.begin();
 
-  pinMode(SENSOR_PIN, INPUT);
-  pinMode(TdsSensorPin, INPUT);
-  T0_temp = 25 + 273.15; // Reference temperature in Kelvin
-
-  // Connect to Wi-Fi
+  // ตั้งค่า Wi-Fi โหมด Station
   WiFi.mode(WIFI_STA);
+
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     Serial.print(".");
     delay(1000);
   }
   Serial.println("\nConnected to WiFi");
-  Serial.printf("IP Address: %s\n", WiFi.localIP().toString().c_str());
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
 
-  // Initialize Blynk
-  Blynk.begin(auth, ssid, password);
-  Serial.println("Blynk initialized");
+  // Set the same WiFi channel for ESP-NOW communication
+  // uint8_t channel = 1; // Replace with the desired channel (1-11)
+  // esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
 
-  // Initialize ESP-NOW
-  if (esp_now_init() != ESP_OK) {
+  // เริ่มต้น ESP-NOW
+  if (esp_now_init() != ESP_OK)
+  {
     Serial.println("ESP-NOW initialization failed!");
     return;
   }
-  esp_now_register_recv_cb(onReceive);
-  Serial.println("Receiver ready");
 
-  Serial.println("Ready to send data.");
+  // เพิ่มข้อมูล peer
+  esp_now_peer_info_t peerInfo;
+  memset(&peerInfo, 0, sizeof(peerInfo));
+  memcpy(peerInfo.peer_addr, receiverMAC, 6); // เพิ่ม MAC address ของตัวรับ
+  peerInfo.channel = 0;                       // ใช้ channel เดิม
+  peerInfo.encrypt = false;                   // ไม่เข้ารหัส
+
+  if (esp_now_add_peer(&peerInfo) != ESP_OK)
+  {
+    Serial.println("Failed to add peer");
+    return;
+  }
+  Serial.println("Peer added successfully");
 }
 
-void loop() {
-  Blynk.run();  // Ensure Blynk updates happen in real time
+void loop()
+{
+  // อ่านค่าจาก Water Sensor
+  waterVal = analogRead(waterSensorPin);
+  Serial.print("Water Sensor Value: ");
+  Serial.println(waterVal);
 
-  // Get the current time
-  static unsigned long lastGoogleSheetUpdate = 0;  // Tracks the last time data was sent to Google Sheets
-  static unsigned long lastLineNotify = 0;         // Tracks the last time Line Notify was sent
-  unsigned long currentMillis = millis();
+  // อ่านค่าจาก Light Sensor
+  lux = LightSensor.GetLightIntensity();
+  Serial.print("Light Sensor Value: ");
+  Serial.print(lux);
+  Serial.println(" lux");
 
-  // Send data to Google Sheets every 5000 milliseconds (5 seconds)
-  if (currentMillis - lastGoogleSheetUpdate >= 5000) {
-    lastGoogleSheetUpdate = currentMillis;
-
-    // Send data to Google Sheets
-    sendToGoogleSheets(receivedData.waterLevel, receivedData.lightIntensity, espData.temperature, espData.tdsValue);
+  // ควบคุม LED ตามค่าความสว่าง
+  if (lux < 400)
+  {
+    digitalWrite(ledPin, HIGH); // สั่งให้ LED สว่าง
+    Serial.println("LED ON");
+  }
+  if (lux > 400)
+  {
+    digitalWrite(ledPin, LOW); // สั่งให้ LED ดับ
+    Serial.println("LED OFF");
   }
 
-  // Check if thresholds are exceeded for Line Notify
-  if ((receivedData.lightIntensity > 1000 || espData.tdsValue > 500 || espData.temperature > 33 || espData.temperature < 24 || receivedData.waterLevel == 0) &&
-      (currentMillis - lastLineNotify >= 10000)) {  
-    lastLineNotify = currentMillis;
+  // สร้างโครงสร้างข้อมูลสำหรับส่ง
+  SensorData data;
+  data.waterLevel = waterVal;
+  data.lightIntensity = lux;
 
-    String message = "Warning!\n";
-    if (espData.temperature > 33) {
-      message += "Temperature: " + String(espData.temperature, 2) + "°C\n";
-      message += "The water temperature is too HIGH for aquatic animals. Please change water immediately.\n\n";
-    }
-    if (espData.temperature < 24) {
-      message += "Temperature: " + String(espData.temperature, 2) + "°C\n";
-      message += "The water temperature is too LOW for aquatic animals. Please change water immediately.\n\n";
-    }
-    if (espData.tdsValue > 500) {
-      message += "TDS: " + String(espData.tdsValue, 2) + " ppm\n";
-      message += "Water quality is too LOW for aquatic animals. Please change water immediately.\n\n";
-    }
-    if (receivedData.lightIntensity > 1000) {
-      message += "Light Intensity: " + String(receivedData.lightIntensity) + " lux\n";
-      message += "Light intensity is too HIGH for aquatic animals. Please lower immediately.\n\n";
-    }
-    if (receivedData.waterLevel == 0) {
-      message += "Water Level: " + String(receivedData.waterLevel) + "\n";
-      message += "Water level is too LOW for aquatic animals. Please fill water immediately.\n\n";
-    }
-    sendLineNotify(message);  // Send the notification
-    Serial.println(message);
+  // ส่งข้อมูลไปยังตัวรับ
+  esp_err_t result = esp_now_send(receiverMAC, (uint8_t *)&data, sizeof(data));
+  if (result == ESP_OK)
+  {
+    Serial.println("Data sent successfully");
   }
+  else
+  {
+    Serial.println("Error sending data");
+  }
+
+  delay(1000);
 }
